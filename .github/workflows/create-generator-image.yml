@@ -13,10 +13,28 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: test
+        run: make test
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ !startsWith(github.event.ref, 'refs/tags/') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: build
+        run: make build
+  build-push:
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ startsWith(github.event.ref, 'refs/tags/') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: build
+        run: make build
+      - name: tag
         run: |
-          make test
+          docker tag fernapi/fern-go-sdk ghcr.io/sayari-analytics/fern-go-sdk:${GITHUB_REF#refs/*/}
