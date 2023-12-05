@@ -16,3 +16,4 @@ jobs:
           owner: fern-api
           base: main
           head: main
+          ignore_fail: true
