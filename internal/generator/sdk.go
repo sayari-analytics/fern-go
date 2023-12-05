@@ -126,6 +126,9 @@ func (f *fileWriter) WriteClientOptionsDefinition(
 			typeReferenceToGoType(header.ValueType, f.types, f.scope, f.baseImportPath, importPath, false),
 		)
 	}
+	// Add rate limiter
+	f.P("RateLimiter *RateLimiter")
+
 	f.P("}")
 	f.P()
 
@@ -399,6 +402,16 @@ func (f *fileWriter) WriteClientOptions(
 		f.P("}")
 		f.P()
 	}
+
+	// Add rate limiter
+	f.P("// WithRateLimiter will provide a rate limiter for the client.")
+	f.P("func WithRateLimiter(rateLimiter *core.RateLimiter) ", clientOptionType, " {")
+	f.P("return func(opts ", clientOptionsType, ") {")
+	f.P("opts.RateLimiter = rateLimiter")
+	f.P("}")
+	f.P("}")
+	f.P()
+
 	if option == nil {
 		return nil, nil
 	}
@@ -464,7 +477,7 @@ func (f *fileWriter) WriteClient(
 	f.P("}")
 	f.P("return &", clientName, "{")
 	f.P(`baseURL: options.BaseURL,`)
-	f.P("caller: core.NewCaller(options.HTTPClient),")
+	f.P("caller: core.NewCaller(options.HTTPClient, options.RateLimiter),")
 	f.P("header: options.ToHeader(),")
 	for _, subpackage := range subpackages {
 		var (
