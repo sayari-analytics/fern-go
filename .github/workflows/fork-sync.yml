@@ -2,7 +2,7 @@ name: Sync Fork
 
 on:
   schedule:
-    - cron: '0 14 * * *' # every day at 2pm GMT / 9am eastern
+    - cron: '0 14 * * 1' # every monday at 2pm GMT / 9am eastern
   workflow_dispatch: # on button click
 
 jobs:
@@ -17,3 +17,4 @@ jobs:
           base: main
           head: main
           ignore_fail: true
+          pr_message: "This is an automated PR. @davidkonigsberg please review."
