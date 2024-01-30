@@ -7,6 +7,7 @@ import (
 	fmt "fmt"
 	fern "github.com/literal-headers/fern"
 	core "github.com/literal-headers/fern/core"
+	option "github.com/literal-headers/fern/option"
 	http "net/http"
 )
 
@@ -16,26 +17,37 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) Get(ctx context.Context, request *fern.WithNonLiteralHeadersRequest) error {
+func (c *Client) Get(
+	ctx context.Context,
+	request *fern.WithNonLiteralHeadersRequest,
+	opts ...option.RequestOption,
+) error {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "with-non-literal-headers"
 
-	headers := c.header.Clone()
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 	headers.Add("nonLiteralEndpointHeader", fmt.Sprintf("%v", request.NonLiteralEndpointHeader))
 	headers.Add("literalEndpointHeader", fmt.Sprintf("%v", "endpoint header"))
 	headers.Add("trueEndpointHeader", fmt.Sprintf("%v", true))
@@ -43,9 +55,11 @@ func (c *Client) Get(ctx context.Context, request *fern.WithNonLiteralHeadersReq
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:     endpointURL,
-			Method:  http.MethodPost,
-			Headers: headers,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
 		},
 	); err != nil {
 		return err

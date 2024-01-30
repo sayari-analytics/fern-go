@@ -4,6 +4,7 @@ package client
 
 import (
 	core "github.com/enum-query-params/fern/core"
+	option "github.com/enum-query-params/fern/option"
 	svc "github.com/enum-query-params/fern/svc"
 	http "net/http"
 )
@@ -16,15 +17,17 @@ type Client struct {
 	Svc *svc.Client
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
-		Svc:     svc.NewClient(opts...),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
+		Svc:    svc.NewClient(opts...),
 	}
 }

@@ -10,6 +10,7 @@ import (
 	fmt "fmt"
 	fixtures "github.com/fern-api/fern-go/internal/testdata/sdk/mergent/fixtures"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/mergent/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/mergent/fixtures/option"
 	io "io"
 	http "net/http"
 )
@@ -20,33 +21,47 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) GetTasks(ctx context.Context) ([]*fixtures.Task, error) {
+func (c *Client) GetTasks(
+	ctx context.Context,
+	opts ...option.RequestOption,
+) ([]*fixtures.Task, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "tasks"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response []*fixtures.Task
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -54,12 +69,23 @@ func (c *Client) GetTasks(ctx context.Context) ([]*fixtures.Task, error) {
 	return response, nil
 }
 
-func (c *Client) PostTasks(ctx context.Context, request *fixtures.TaskNew) (*fixtures.Task, error) {
+func (c *Client) PostTasks(
+	ctx context.Context,
+	request *fixtures.TaskNew,
+	opts ...option.RequestOption,
+) (*fixtures.Task, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "tasks"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -93,7 +119,9 @@ func (c *Client) PostTasks(ctx context.Context, request *fixtures.TaskNew) (*fix
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPost,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Request:      request,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
@@ -104,13 +132,24 @@ func (c *Client) PostTasks(ctx context.Context, request *fixtures.TaskNew) (*fix
 	return response, nil
 }
 
-// Task ID
-func (c *Client) GetTasksTaskId(ctx context.Context, taskId fixtures.Id) (*fixtures.Task, error) {
+func (c *Client) GetTasksTaskId(
+	ctx context.Context,
+	// Task ID
+	taskId fixtures.Id,
+	opts ...option.RequestOption,
+) (*fixtures.Task, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"tasks/%v", taskId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -137,7 +176,9 @@ func (c *Client) GetTasksTaskId(ctx context.Context, taskId fixtures.Id) (*fixtu
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodGet,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
 		},
@@ -147,13 +188,25 @@ func (c *Client) GetTasksTaskId(ctx context.Context, taskId fixtures.Id) (*fixtu
 	return response, nil
 }
 
-// Task ID
-func (c *Client) PatchTasksTaskId(ctx context.Context, taskId fixtures.Id, request *fixtures.Task) (*fixtures.Task, error) {
+func (c *Client) PatchTasksTaskId(
+	ctx context.Context,
+	// Task ID
+	taskId fixtures.Id,
+	request *fixtures.Task,
+	opts ...option.RequestOption,
+) (*fixtures.Task, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"tasks/%v", taskId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -194,7 +247,9 @@ func (c *Client) PatchTasksTaskId(ctx context.Context, taskId fixtures.Id, reque
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPatch,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Request:      request,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
@@ -205,13 +260,24 @@ func (c *Client) PatchTasksTaskId(ctx context.Context, taskId fixtures.Id, reque
 	return response, nil
 }
 
-// Task ID
-func (c *Client) DeleteTasksTaskId(ctx context.Context, taskId fixtures.Id) error {
+func (c *Client) DeleteTasksTaskId(
+	ctx context.Context,
+	// Task ID
+	taskId fixtures.Id,
+	opts ...option.RequestOption,
+) error {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"tasks/%v", taskId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -237,7 +303,9 @@ func (c *Client) DeleteTasksTaskId(ctx context.Context, taskId fixtures.Id) erro
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodDelete,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			ErrorDecoder: errorDecoder,
 		},
 	); err != nil {
@@ -247,14 +315,24 @@ func (c *Client) DeleteTasksTaskId(ctx context.Context, taskId fixtures.Id) erro
 }
 
 // Reschedules a queued Task to be run immediately.
-//
-// Task ID
-func (c *Client) PostTasksTaskIdRun(ctx context.Context, taskId fixtures.Id) (*fixtures.Task, error) {
+func (c *Client) PostTasksTaskIdRun(
+	ctx context.Context,
+	// Task ID
+	taskId fixtures.Id,
+	opts ...option.RequestOption,
+) (*fixtures.Task, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"tasks/%v/run", taskId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -288,7 +366,9 @@ func (c *Client) PostTasksTaskIdRun(ctx context.Context, taskId fixtures.Id) (*f
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPost,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
 		},
@@ -302,12 +382,23 @@ func (c *Client) PostTasksTaskIdRun(ctx context.Context, taskId fixtures.Id) (*f
 // This operation is atomic: it will succeed for all Tasks or fail for all
 // Tasks; there is no partial success.
 // This endpoint is in beta and may change at any time without notice.
-func (c *Client) PostTasksBatchCreate(ctx context.Context, request []*fixtures.TaskNew) ([]*fixtures.Task, error) {
+func (c *Client) PostTasksBatchCreate(
+	ctx context.Context,
+	request []*fixtures.TaskNew,
+	opts ...option.RequestOption,
+) ([]*fixtures.Task, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "tasks/batch-create"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -355,7 +446,9 @@ func (c *Client) PostTasksBatchCreate(ctx context.Context, request []*fixtures.T
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPost,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Request:      request,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
@@ -370,12 +463,23 @@ func (c *Client) PostTasksBatchCreate(ctx context.Context, request []*fixtures.T
 // This operation is atomic: it will succeed for all Tasks or fail for all
 // Tasks; there is no partial success.
 // This endpoint is in beta and may change at any time without notice.
-func (c *Client) PostTasksBatchDelete(ctx context.Context, request []fixtures.Id) error {
+func (c *Client) PostTasksBatchDelete(
+	ctx context.Context,
+	request []fixtures.Id,
+	opts ...option.RequestOption,
+) error {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "tasks/batch-delete"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -408,7 +512,9 @@ func (c *Client) PostTasksBatchDelete(ctx context.Context, request []fixtures.Id
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPost,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Request:      request,
 			ErrorDecoder: errorDecoder,
 		},
@@ -418,21 +524,33 @@ func (c *Client) PostTasksBatchDelete(ctx context.Context, request []fixtures.Id
 	return nil
 }
 
-func (c *Client) GetSchedules(ctx context.Context) ([]*fixtures.Schedule, error) {
+func (c *Client) GetSchedules(
+	ctx context.Context,
+	opts ...option.RequestOption,
+) ([]*fixtures.Schedule, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "schedules"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response []*fixtures.Schedule
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -440,12 +558,23 @@ func (c *Client) GetSchedules(ctx context.Context) ([]*fixtures.Schedule, error)
 	return response, nil
 }
 
-func (c *Client) PostSchedules(ctx context.Context, request *fixtures.ScheduleNew) (*fixtures.Schedule, error) {
+func (c *Client) PostSchedules(
+	ctx context.Context,
+	request *fixtures.ScheduleNew,
+	opts ...option.RequestOption,
+) (*fixtures.Schedule, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "schedules"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -472,7 +601,9 @@ func (c *Client) PostSchedules(ctx context.Context, request *fixtures.ScheduleNe
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPost,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Request:      request,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
@@ -483,13 +614,24 @@ func (c *Client) PostSchedules(ctx context.Context, request *fixtures.ScheduleNe
 	return response, nil
 }
 
-// Schedule ID
-func (c *Client) GetSchedulesScheduleId(ctx context.Context, scheduleId fixtures.Id) (*fixtures.Schedule, error) {
+func (c *Client) GetSchedulesScheduleId(
+	ctx context.Context,
+	// Schedule ID
+	scheduleId fixtures.Id,
+	opts ...option.RequestOption,
+) (*fixtures.Schedule, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"schedules/%v", scheduleId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -516,7 +658,9 @@ func (c *Client) GetSchedulesScheduleId(ctx context.Context, scheduleId fixtures
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodGet,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
 		},
@@ -526,13 +670,25 @@ func (c *Client) GetSchedulesScheduleId(ctx context.Context, scheduleId fixtures
 	return response, nil
 }
 
-// Schedule ID
-func (c *Client) PatchSchedulesScheduleId(ctx context.Context, scheduleId fixtures.Id, request *fixtures.Schedule) (*fixtures.Schedule, error) {
+func (c *Client) PatchSchedulesScheduleId(
+	ctx context.Context,
+	// Schedule ID
+	scheduleId fixtures.Id,
+	request *fixtures.Schedule,
+	opts ...option.RequestOption,
+) (*fixtures.Schedule, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"schedules/%v", scheduleId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -566,7 +722,9 @@ func (c *Client) PatchSchedulesScheduleId(ctx context.Context, scheduleId fixtur
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPatch,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Request:      request,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
@@ -577,13 +735,24 @@ func (c *Client) PatchSchedulesScheduleId(ctx context.Context, scheduleId fixtur
 	return response, nil
 }
 
-// Schedule ID
-func (c *Client) DeleteSchedulesScheduleId(ctx context.Context, scheduleId fixtures.Id) error {
+func (c *Client) DeleteSchedulesScheduleId(
+	ctx context.Context,
+	// Schedule ID
+	scheduleId fixtures.Id,
+	opts ...option.RequestOption,
+) error {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"schedules/%v", scheduleId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -609,7 +778,9 @@ func (c *Client) DeleteSchedulesScheduleId(ctx context.Context, scheduleId fixtu
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodDelete,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			ErrorDecoder: errorDecoder,
 		},
 	); err != nil {
@@ -618,13 +789,24 @@ func (c *Client) DeleteSchedulesScheduleId(ctx context.Context, scheduleId fixtu
 	return nil
 }
 
-// Schedule ID
-func (c *Client) GetSchedulesScheduleIdTasks(ctx context.Context, scheduleId fixtures.Id) ([]*fixtures.Task, error) {
+func (c *Client) GetSchedulesScheduleIdTasks(
+	ctx context.Context,
+	// Schedule ID
+	scheduleId fixtures.Id,
+	opts ...option.RequestOption,
+) ([]*fixtures.Task, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.mergent.co/v2"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"schedules/%v/tasks", scheduleId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -651,7 +833,9 @@ func (c *Client) GetSchedulesScheduleIdTasks(ctx context.Context, scheduleId fix
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodGet,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
 		},

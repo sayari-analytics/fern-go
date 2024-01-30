@@ -6,6 +6,7 @@ import (
 	context "context"
 	fern "github.com/literal/fern"
 	core "github.com/literal/fern/core"
+	option "github.com/literal/fern/option"
 	http "net/http"
 )
 
@@ -15,34 +16,49 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) CreateOptions(ctx context.Context, request *fern.CreateOptionsRequest) (*fern.CreateOptionsResponse, error) {
+func (c *Client) CreateOptions(
+	ctx context.Context,
+	request *fern.CreateOptionsRequest,
+	opts ...option.RequestOption,
+) (*fern.CreateOptionsResponse, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "options"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response *fern.CreateOptionsResponse
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -50,22 +66,35 @@ func (c *Client) CreateOptions(ctx context.Context, request *fern.CreateOptionsR
 	return response, nil
 }
 
-func (c *Client) GetOptions(ctx context.Context, request *fern.GetOptionsRequest) (*fern.Options, error) {
+func (c *Client) GetOptions(
+	ctx context.Context,
+	request *fern.GetOptionsRequest,
+	opts ...option.RequestOption,
+) (*fern.Options, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "options"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response *fern.Options
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -73,22 +102,35 @@ func (c *Client) GetOptions(ctx context.Context, request *fern.GetOptionsRequest
 	return response, nil
 }
 
-func (c *Client) GetUndiscriminatedOptions(ctx context.Context, request *fern.GetUndiscriminatedOptionsRequest) (*fern.UndiscriminatedOptions, error) {
+func (c *Client) GetUndiscriminatedOptions(
+	ctx context.Context,
+	request *fern.GetUndiscriminatedOptionsRequest,
+	opts ...option.RequestOption,
+) (*fern.UndiscriminatedOptions, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "options"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response *fern.UndiscriminatedOptions
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err

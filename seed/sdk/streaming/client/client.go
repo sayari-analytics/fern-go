@@ -5,6 +5,7 @@ package client
 import (
 	core "github.com/fern-api/stream-go/v2/core"
 	dummy "github.com/fern-api/stream-go/v2/dummy"
+	option "github.com/fern-api/stream-go/v2/option"
 	http "net/http"
 )
 
@@ -16,15 +17,17 @@ type Client struct {
 	Dummy *dummy.Client
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
-		Dummy:   dummy.NewClient(opts...),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
+		Dummy:  dummy.NewClient(opts...),
 	}
 }

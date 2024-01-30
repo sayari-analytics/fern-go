@@ -27,6 +27,21 @@ type HTTPClient interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
+// MergeHeaders merges the given headers together, where the right
+// takes precedence over the left.
+func MergeHeaders(left, right http.Header) http.Header {
+	for key, values := range right {
+		if len(values) > 1 {
+			left[key] = values
+			continue
+		}
+		if value := right.Get(key); value != "" {
+			left.Set(key, value)
+		}
+	}
+	return left
+}
+
 // WriteMultipartJSON writes the given value as a JSON part.
 // This is used to serialize non-primitive multipart properties
 // (i.e. lists, objects, etc).
@@ -132,13 +147,29 @@ func (r *RateLimiter) Wait() {
 // Caller calls APIs and deserializes their response, if any.
 type Caller struct {
 	client      HTTPClient
+	retrier     *Retrier
 	rateLimiter *RateLimiter
 }
 
-// NewCaller returns a new *Caller backed by the given HTTP client.
-func NewCaller(client HTTPClient, rateLimiter *RateLimiter) *Caller {
+// CallerParams represents the parameters used to constrcut a new *Caller.
+type CallerParams struct {
+	Client      HTTPClient
+	MaxAttempts uint
+}
+
+// NewCaller returns a new *Caller backed by the given parameters.
+func NewCaller(params *CallerParams, rateLimiter *RateLimiter) *Caller {
+	var httpClient HTTPClient = http.DefaultClient
+	if params.Client != nil {
+		httpClient = params.Client
+	}
+	var retryOptions []RetryOption
+	if params.MaxAttempts > 0 {
+		retryOptions = append(retryOptions, WithMaxAttempts(params.MaxAttempts))
+	}
 	caller := Caller{
-		client: client,
+		client:  httpClient,
+		retrier: NewRetrier(retryOptions...),
 	}
 	if rateLimiter != nil {
 		caller.rateLimiter = rateLimiter
@@ -150,7 +181,9 @@ func NewCaller(client HTTPClient, rateLimiter *RateLimiter) *Caller {
 type CallParams struct {
 	URL                string
 	Method             string
+	MaxAttempts        uint
 	Headers            http.Header
+	Client             HTTPClient
 	Request            interface{}
 	Response           interface{}
 	ResponseIsOptional bool
@@ -172,7 +205,24 @@ func (c *Caller) Call(ctx context.Context, params *CallParams) error {
 	// Wait for rate limiter if needed
 	c.rateLimiter.Wait()
 
-	resp, err := c.client.Do(req)
+	client := c.client
+	if params.Client != nil {
+		// Use the HTTP client scoped to the request.
+		client = params.Client
+	}
+
+	var retryOptions []RetryOption
+	if params.MaxAttempts > 0 {
+		retryOptions = append(retryOptions, WithMaxAttempts(params.MaxAttempts))
+	}
+
+	resp, err := c.retrier.Run(
+		client.Do,
+		req,
+		params.ErrorDecoder,
+		retryOptions...,
+	)
+
 	if err != nil {
 		return err
 	}

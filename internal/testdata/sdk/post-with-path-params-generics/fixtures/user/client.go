@@ -5,6 +5,7 @@ package user
 import (
 	sdk "acme.io/sdk"
 	core "acme.io/sdk/core"
+	option "acme.io/sdk/option"
 	context "context"
 	fmt "fmt"
 	http "net/http"
@@ -17,34 +18,50 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) SetName(ctx context.Context, userId string, request string) (string, error) {
+func (c *Client) SetName(
+	ctx context.Context,
+	userId string,
+	request string,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
+	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
 	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"users/%v/set-name", userId)
 
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
+
 	var response string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -52,22 +69,36 @@ func (c *Client) SetName(ctx context.Context, userId string, request string) (st
 	return response, nil
 }
 
-func (c *Client) SetNameV2(ctx context.Context, userId string, request *sdk.SetNameRequest) (string, error) {
+func (c *Client) SetNameV2(
+	ctx context.Context,
+	userId string,
+	request *sdk.SetNameRequest,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
+	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
 	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"users/%v/set-name-v2", userId)
 
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
+
 	var response string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -75,25 +106,37 @@ func (c *Client) SetNameV2(ctx context.Context, userId string, request *sdk.SetN
 	return response, nil
 }
 
-func (c *Client) SetNameV3(ctx context.Context, userId string, request *sdk.SetNameRequestV3) (*sdk.SetNameRequestV3Body, error) {
+func (c *Client) SetNameV3(
+	ctx context.Context,
+	userId string,
+	request *sdk.SetNameRequestV3,
+	opts ...option.RequestOption,
+) (*sdk.SetNameRequestV3Body, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"users/%v/set-name-v3", userId)
 
-	headers := c.header.Clone()
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 	headers.Add("X-Endpoint-Header", fmt.Sprintf("%v", request.XEndpointHeader))
 
 	var response *sdk.SetNameRequestV3Body
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  headers,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -101,14 +144,24 @@ func (c *Client) SetNameV3(ctx context.Context, userId string, request *sdk.SetN
 	return response, nil
 }
 
-func (c *Client) SetNameV3Optional(ctx context.Context, userId string, request *sdk.SetNameRequestV3Optional) (*sdk.SetNameRequestV3Body, error) {
+func (c *Client) SetNameV3Optional(
+	ctx context.Context,
+	userId string,
+	request *sdk.SetNameRequestV3Optional,
+	opts ...option.RequestOption,
+) (*sdk.SetNameRequestV3Body, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"users/%v/set-name-v3-optional", userId)
 
-	headers := c.header.Clone()
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 	headers.Add("X-Endpoint-Header", fmt.Sprintf("%v", request.XEndpointHeader))
 
 	var response *sdk.SetNameRequestV3Body
@@ -117,7 +170,9 @@ func (c *Client) SetNameV3Optional(ctx context.Context, userId string, request *
 		&core.CallParams{
 			URL:                endpointURL,
 			Method:             http.MethodPost,
+			MaxAttempts:        options.MaxAttempts,
 			Headers:            headers,
+			Client:             options.HTTPClient,
 			Request:            request,
 			Response:           &response,
 			ResponseIsOptional: true,
@@ -128,25 +183,37 @@ func (c *Client) SetNameV3Optional(ctx context.Context, userId string, request *
 	return response, nil
 }
 
-func (c *Client) SetNameV4(ctx context.Context, userId string, request *sdk.SetNameRequestV4) (string, error) {
+func (c *Client) SetNameV4(
+	ctx context.Context,
+	userId string,
+	request *sdk.SetNameRequestV4,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
+	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
 	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"users/%v/set-name-v4", userId)
 
-	headers := c.header.Clone()
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 	headers.Add("X-Endpoint-Header", fmt.Sprintf("%v", request.XEndpointHeader))
 
 	var response string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  headers,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -154,25 +221,37 @@ func (c *Client) SetNameV4(ctx context.Context, userId string, request *sdk.SetN
 	return response, nil
 }
 
-func (c *Client) SetNameV5(ctx context.Context, userId string, request *sdk.SetNameRequestV5) (string, error) {
+func (c *Client) SetNameV5(
+	ctx context.Context,
+	userId string,
+	request *sdk.SetNameRequestV5,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
+	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
 	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"users/%v/set-name-v5", userId)
 
-	headers := c.header.Clone()
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 	headers.Add("X-Endpoint-Header", fmt.Sprintf("%v", request.XEndpointHeader))
 
 	var response string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  headers,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -180,10 +259,20 @@ func (c *Client) SetNameV5(ctx context.Context, userId string, request *sdk.SetN
 	return response, nil
 }
 
-func (c *Client) Update(ctx context.Context, userId string, request *sdk.UpdateRequest) (string, error) {
+func (c *Client) Update(
+	ctx context.Context,
+	userId string,
+	request *sdk.UpdateRequest,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
+	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
 	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"users/%v/update", userId)
 
@@ -196,15 +285,19 @@ func (c *Client) Update(ctx context.Context, userId string, request *sdk.UpdateR
 		endpointURL += "?" + queryParams.Encode()
 	}
 
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
+
 	var response string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err

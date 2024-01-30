@@ -8,6 +8,7 @@ import (
 	fmt "fmt"
 	fixtures "github.com/fern-api/fern-go/internal/testdata/sdk/upload/fixtures"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/upload/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/upload/fixtures/option"
 	io "io"
 	multipart "mime/multipart"
 	http "net/http"
@@ -19,24 +20,38 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) Upload(ctx context.Context, file io.Reader, request *fixtures.UploadRequest) (string, error) {
+func (c *Client) Upload(
+	ctx context.Context,
+	file io.Reader,
+	request *fixtures.UploadRequest,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "file/upload"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response string
 	requestBuffer := bytes.NewBuffer(nil)
@@ -61,16 +76,18 @@ func (c *Client) Upload(ctx context.Context, file io.Reader, request *fixtures.U
 	if err := writer.Close(); err != nil {
 		return "", err
 	}
-	c.header.Set("Content-Type", writer.FormDataContentType())
+	headers.Set("Content-Type", writer.FormDataContentType())
 
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  requestBuffer,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     requestBuffer,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -78,12 +95,23 @@ func (c *Client) Upload(ctx context.Context, file io.Reader, request *fixtures.U
 	return response, nil
 }
 
-func (c *Client) UploadSimple(ctx context.Context, file io.Reader) (string, error) {
+func (c *Client) UploadSimple(
+	ctx context.Context,
+	file io.Reader,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "file/upload-simple"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response string
 	requestBuffer := bytes.NewBuffer(nil)
@@ -102,16 +130,18 @@ func (c *Client) UploadSimple(ctx context.Context, file io.Reader) (string, erro
 	if err := writer.Close(); err != nil {
 		return "", err
 	}
-	c.header.Set("Content-Type", writer.FormDataContentType())
+	headers.Set("Content-Type", writer.FormDataContentType())
 
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  requestBuffer,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     requestBuffer,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -119,12 +149,25 @@ func (c *Client) UploadSimple(ctx context.Context, file io.Reader) (string, erro
 	return response, nil
 }
 
-func (c *Client) UploadMultiple(ctx context.Context, file io.Reader, optionalFile io.Reader, request *fixtures.UploadMultiRequest) (string, error) {
+func (c *Client) UploadMultiple(
+	ctx context.Context,
+	file io.Reader,
+	optionalFile io.Reader,
+	request *fixtures.UploadMultiRequest,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "file/upload-multi"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response string
 	requestBuffer := bytes.NewBuffer(nil)
@@ -159,16 +202,18 @@ func (c *Client) UploadMultiple(ctx context.Context, file io.Reader, optionalFil
 	if err := writer.Close(); err != nil {
 		return "", err
 	}
-	c.header.Set("Content-Type", writer.FormDataContentType())
+	headers.Set("Content-Type", writer.FormDataContentType())
 
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  requestBuffer,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     requestBuffer,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err

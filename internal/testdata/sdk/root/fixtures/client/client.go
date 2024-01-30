@@ -11,6 +11,7 @@ import (
 	fixtures "github.com/fern-api/fern-go/internal/testdata/sdk/root/fixtures"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/root/fixtures/core"
 	nestedclient "github.com/fern-api/fern-go/internal/testdata/sdk/root/fixtures/nested/client"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/root/fixtures/option"
 	io "io"
 	http "net/http"
 )
@@ -23,34 +24,48 @@ type Client struct {
 	Nested *nestedclient.Client
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
-		Nested:  nestedclient.NewClient(opts...),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
+		Nested: nestedclient.NewClient(opts...),
 	}
 }
 
-func (c *Client) GetFoo(ctx context.Context) ([]*fixtures.Foo, error) {
+func (c *Client) GetFoo(
+	ctx context.Context,
+	opts ...option.RequestOption,
+) ([]*fixtures.Foo, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "foo"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response []*fixtures.Foo
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -58,12 +73,23 @@ func (c *Client) GetFoo(ctx context.Context) ([]*fixtures.Foo, error) {
 	return response, nil
 }
 
-func (c *Client) PostFoo(ctx context.Context, request *fixtures.Bar) (*fixtures.Foo, error) {
+func (c *Client) PostFoo(
+	ctx context.Context,
+	request *fixtures.Bar,
+	opts ...option.RequestOption,
+) (*fixtures.Foo, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "foo"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -97,7 +123,9 @@ func (c *Client) PostFoo(ctx context.Context, request *fixtures.Bar) (*fixtures.
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPost,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Request:      request,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
@@ -108,12 +136,23 @@ func (c *Client) PostFoo(ctx context.Context, request *fixtures.Bar) (*fixtures.
 	return response, nil
 }
 
-func (c *Client) GetFooFooId(ctx context.Context, fooId fixtures.Id) (*fixtures.Foo, error) {
+func (c *Client) GetFooFooId(
+	ctx context.Context,
+	fooId fixtures.Id,
+	opts ...option.RequestOption,
+) (*fixtures.Foo, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"foo/%v", fooId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -140,7 +179,9 @@ func (c *Client) GetFooFooId(ctx context.Context, fooId fixtures.Id) (*fixtures.
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodGet,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
 		},
@@ -150,12 +191,24 @@ func (c *Client) GetFooFooId(ctx context.Context, fooId fixtures.Id) (*fixtures.
 	return response, nil
 }
 
-func (c *Client) PatchFooFooId(ctx context.Context, fooId fixtures.Id, request *fixtures.Foo) (*fixtures.Foo, error) {
+func (c *Client) PatchFooFooId(
+	ctx context.Context,
+	fooId fixtures.Id,
+	request *fixtures.Foo,
+	opts ...option.RequestOption,
+) (*fixtures.Foo, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"foo/%v", fooId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -196,7 +249,9 @@ func (c *Client) PatchFooFooId(ctx context.Context, fooId fixtures.Id, request *
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPatch,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Request:      request,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
@@ -207,12 +262,23 @@ func (c *Client) PatchFooFooId(ctx context.Context, fooId fixtures.Id, request *
 	return response, nil
 }
 
-func (c *Client) DeleteFooFooId(ctx context.Context, fooId fixtures.Id) error {
+func (c *Client) DeleteFooFooId(
+	ctx context.Context,
+	fooId fixtures.Id,
+	opts ...option.RequestOption,
+) error {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"foo/%v", fooId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -238,7 +304,9 @@ func (c *Client) DeleteFooFooId(ctx context.Context, fooId fixtures.Id) error {
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodDelete,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			ErrorDecoder: errorDecoder,
 		},
 	); err != nil {
@@ -247,12 +315,23 @@ func (c *Client) DeleteFooFooId(ctx context.Context, fooId fixtures.Id) error {
 	return nil
 }
 
-func (c *Client) PostFooFooIdRun(ctx context.Context, fooId fixtures.Id) (*fixtures.Foo, error) {
+func (c *Client) PostFooFooIdRun(
+	ctx context.Context,
+	fooId fixtures.Id,
+	opts ...option.RequestOption,
+) (*fixtures.Foo, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"foo/%v/run", fooId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -286,7 +365,9 @@ func (c *Client) PostFooFooIdRun(ctx context.Context, fooId fixtures.Id) (*fixtu
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPost,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
 		},
@@ -296,12 +377,23 @@ func (c *Client) PostFooFooIdRun(ctx context.Context, fooId fixtures.Id) (*fixtu
 	return response, nil
 }
 
-func (c *Client) PostFooBatchCreate(ctx context.Context, request []*fixtures.Bar) ([]*fixtures.Foo, error) {
+func (c *Client) PostFooBatchCreate(
+	ctx context.Context,
+	request []*fixtures.Bar,
+	opts ...option.RequestOption,
+) ([]*fixtures.Foo, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "foo/batch-create"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -349,7 +441,9 @@ func (c *Client) PostFooBatchCreate(ctx context.Context, request []*fixtures.Bar
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPost,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Request:      request,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
@@ -360,12 +454,23 @@ func (c *Client) PostFooBatchCreate(ctx context.Context, request []*fixtures.Bar
 	return response, nil
 }
 
-func (c *Client) PostFooBatchDelete(ctx context.Context, request []fixtures.Id) error {
+func (c *Client) PostFooBatchDelete(
+	ctx context.Context,
+	request []fixtures.Id,
+	opts ...option.RequestOption,
+) error {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "foo/batch-delete"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -398,7 +503,9 @@ func (c *Client) PostFooBatchDelete(ctx context.Context, request []fixtures.Id) 
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPost,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Request:      request,
 			ErrorDecoder: errorDecoder,
 		},

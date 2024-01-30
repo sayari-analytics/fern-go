@@ -7,6 +7,7 @@ import (
 	fmt "fmt"
 	fixtures "github.com/fern-api/fern-go/internal/testdata/sdk/query-params/fixtures"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/query-params/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/query-params/fixtures/option"
 	http "net/http"
 	url "net/url"
 )
@@ -17,22 +18,33 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) GetAllUsers(ctx context.Context, request *fixtures.GetAllUsersRequest) (string, error) {
+func (c *Client) GetAllUsers(
+	ctx context.Context,
+	request *fixtures.GetAllUsersRequest,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
+	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
 	}
 	endpointURL := baseURL + "/" + "users/all"
 
@@ -45,17 +57,19 @@ func (c *Client) GetAllUsers(ctx context.Context, request *fixtures.GetAllUsersR
 		endpointURL += "?" + queryParams.Encode()
 	}
 
-	headers := c.header.Clone()
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 	headers.Add("X-Endpoint-Header", fmt.Sprintf("%v", request.XEndpointHeader))
 
 	var response string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  headers,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err

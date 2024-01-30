@@ -5,6 +5,7 @@ package auth
 import (
 	context "context"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/multi-environments/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/multi-environments/fixtures/option"
 	http "net/http"
 )
 
@@ -14,33 +15,47 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) GetAuth(ctx context.Context) (string, error) {
+func (c *Client) GetAuth(
+	ctx context.Context,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://auth.yoursite.com"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "auth"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -48,21 +63,33 @@ func (c *Client) GetAuth(ctx context.Context) (string, error) {
 	return response, nil
 }
 
-func (c *Client) ListAuth(ctx context.Context) ([]string, error) {
+func (c *Client) ListAuth(
+	ctx context.Context,
+	opts ...option.RequestOption,
+) ([]string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://auth.yoursite.com"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "auth/list"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response []string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -70,21 +97,33 @@ func (c *Client) ListAuth(ctx context.Context) ([]string, error) {
 	return response, nil
 }
 
-func (c *Client) ListPlants(ctx context.Context) ([]string, error) {
+func (c *Client) ListPlants(
+	ctx context.Context,
+	opts ...option.RequestOption,
+) ([]string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://plants.yoursite.com"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "auth/plants"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response []string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
