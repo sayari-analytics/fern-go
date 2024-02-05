@@ -8,6 +8,7 @@ import (
 	fmt "fmt"
 	fern "github.com/file-upload/fern"
 	core "github.com/file-upload/fern/core"
+	option "github.com/file-upload/fern/option"
 	io "io"
 	multipart "mime/multipart"
 	http "net/http"
@@ -20,24 +21,39 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) Post(ctx context.Context, file io.Reader, maybeFile io.Reader, request *fern.MyRequest) error {
+func (c *Client) Post(
+	ctx context.Context,
+	file io.Reader,
+	maybeFile io.Reader,
+	request *fern.MyRequest,
+	opts ...option.RequestOption,
+) error {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	requestBuffer := bytes.NewBuffer(nil)
 	writer := multipart.NewWriter(requestBuffer)
@@ -116,15 +132,17 @@ func (c *Client) Post(ctx context.Context, file io.Reader, maybeFile io.Reader, 
 	if err := writer.Close(); err != nil {
 		return err
 	}
-	c.header.Set("Content-Type", writer.FormDataContentType())
+	headers.Set("Content-Type", writer.FormDataContentType())
 
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:     endpointURL,
-			Method:  http.MethodPost,
-			Headers: c.header,
-			Request: requestBuffer,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     requestBuffer,
 		},
 	); err != nil {
 		return err
@@ -132,12 +150,23 @@ func (c *Client) Post(ctx context.Context, file io.Reader, maybeFile io.Reader, 
 	return nil
 }
 
-func (c *Client) JustFile(ctx context.Context, file io.Reader) error {
+func (c *Client) JustFile(
+	ctx context.Context,
+	file io.Reader,
+	opts ...option.RequestOption,
+) error {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "just-file"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	requestBuffer := bytes.NewBuffer(nil)
 	writer := multipart.NewWriter(requestBuffer)
@@ -155,15 +184,17 @@ func (c *Client) JustFile(ctx context.Context, file io.Reader) error {
 	if err := writer.Close(); err != nil {
 		return err
 	}
-	c.header.Set("Content-Type", writer.FormDataContentType())
+	headers.Set("Content-Type", writer.FormDataContentType())
 
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:     endpointURL,
-			Method:  http.MethodPost,
-			Headers: c.header,
-			Request: requestBuffer,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     requestBuffer,
 		},
 	); err != nil {
 		return err
@@ -171,10 +202,20 @@ func (c *Client) JustFile(ctx context.Context, file io.Reader) error {
 	return nil
 }
 
-func (c *Client) JustFileWithQueryParams(ctx context.Context, file io.Reader, request *fern.JustFileWithQueryParamsRequet) error {
+func (c *Client) JustFileWithQueryParams(
+	ctx context.Context,
+	file io.Reader,
+	request *fern.JustFileWithQueryParamsRequet,
+	opts ...option.RequestOption,
+) error {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
+	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
 	}
 	endpointURL := baseURL + "/" + "just-file-with-query-params"
 
@@ -196,6 +237,8 @@ func (c *Client) JustFileWithQueryParams(ctx context.Context, file io.Reader, re
 		endpointURL += "?" + queryParams.Encode()
 	}
 
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
+
 	requestBuffer := bytes.NewBuffer(nil)
 	writer := multipart.NewWriter(requestBuffer)
 	fileFilename := "file_filename"
@@ -212,15 +255,17 @@ func (c *Client) JustFileWithQueryParams(ctx context.Context, file io.Reader, re
 	if err := writer.Close(); err != nil {
 		return err
 	}
-	c.header.Set("Content-Type", writer.FormDataContentType())
+	headers.Set("Content-Type", writer.FormDataContentType())
 
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:     endpointURL,
-			Method:  http.MethodPost,
-			Headers: c.header,
-			Request: requestBuffer,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     requestBuffer,
 		},
 	); err != nil {
 		return err

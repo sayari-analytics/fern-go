@@ -5,6 +5,7 @@ package client
 import (
 	core "github.com/literal/fern/core"
 	literal "github.com/literal/fern/literal"
+	option "github.com/literal/fern/option"
 	http "net/http"
 )
 
@@ -16,14 +17,16 @@ type Client struct {
 	Literal *literal.Client
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
 		header:  options.ToHeader(),
 		Literal: literal.NewClient(opts...),
 	}

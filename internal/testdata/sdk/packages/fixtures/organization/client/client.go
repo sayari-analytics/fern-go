@@ -7,6 +7,7 @@ import (
 	fmt "fmt"
 	fixtures "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/option"
 	metricsclient "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/organization/metrics/client"
 	http "net/http"
 )
@@ -19,34 +20,49 @@ type Client struct {
 	Metrics *metricsclient.Client
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
 		header:  options.ToHeader(),
 		Metrics: metricsclient.NewClient(opts...),
 	}
 }
 
-func (c *Client) Check(ctx context.Context, id string) (*fixtures.Organization, error) {
+func (c *Client) Check(
+	ctx context.Context,
+	id string,
+	opts ...option.RequestOption,
+) (*fixtures.Organization, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"organization/%v", id)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response *fixtures.Organization
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err

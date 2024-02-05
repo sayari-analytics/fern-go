@@ -4,108 +4,89 @@ package client
 
 import (
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/headers/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/headers/fixtures/option"
 	uuid "github.com/google/uuid"
 	http "net/http"
 	time "time"
 )
 
-// WithBaseURL sets the client's base URL, overriding the
-// default environment, if any.
-func WithBaseURL(baseURL string) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.BaseURL = baseURL
-	}
+// WithBaseURL sets the base URL, overriding the default
+// environment, if any.
+func WithBaseURL(baseURL string) *core.BaseURLOption {
+	return option.WithBaseURL(baseURL)
 }
 
-// WithHTTPClient uses the given HTTPClient to issue all HTTP requests.
-func WithHTTPClient(httpClient core.HTTPClient) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.HTTPClient = httpClient
-	}
+// WithHTTPClient uses the given HTTPClient to issue the request.
+func WithHTTPClient(httpClient core.HTTPClient) *core.HTTPClientOption {
+	return option.WithHTTPClient(httpClient)
 }
 
-// WithHTTPHeader adds the given http.Header to all requests
-// issued by the client.
-func WithHTTPHeader(httpHeader http.Header) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		// Clone the headers so they can't be modified after the option call.
-		opts.HTTPHeader = httpHeader.Clone()
-	}
+// WithHTTPHeader adds the given http.Header to the request.
+func WithHTTPHeader(httpHeader http.Header) *core.HTTPHeaderOption {
+	return option.WithHTTPHeader(httpHeader)
 }
 
-// WithCustom sets the custom auth header on every request.
-func WithCustom(custom *[]byte) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.Custom = custom
-	}
+// WithMaxAttempts configures the maximum number of retry attempts.
+func WithMaxAttempts(attempts uint) *core.MaxAttemptsOption {
+	return option.WithMaxAttempts(attempts)
 }
 
-// WithXApiName sets the xApiName header on every request.
-func WithXApiName(xApiName string) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.XApiName = xApiName
-	}
+// WithCustom sets the custom auth request header.
+func WithCustom(custom *[]byte) *core.CustomOption {
+	return option.WithCustom(custom)
 }
 
-// WithXApiId sets the xApiId header on every request.
-func WithXApiId(xApiId uuid.UUID) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.XApiId = xApiId
-	}
+// WithXApiName sets the xApiName request header.
+func WithXApiName(xApiName string) *core.XApiNameOption {
+	return option.WithXApiName(xApiName)
 }
 
-// WithXApiDatetime sets the xApiDatetime header on every request.
-func WithXApiDatetime(xApiDatetime time.Time) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.XApiDatetime = xApiDatetime
-	}
+// WithXApiId sets the xApiId request header.
+func WithXApiId(xApiId uuid.UUID) *core.XApiIdOption {
+	return option.WithXApiId(xApiId)
 }
 
-// WithXApiDate sets the xApiDate header on every request.
-func WithXApiDate(xApiDate time.Time) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.XApiDate = xApiDate
-	}
+// WithXApiDatetime sets the xApiDatetime request header.
+func WithXApiDatetime(xApiDatetime time.Time) *core.XApiDatetimeOption {
+	return option.WithXApiDatetime(xApiDatetime)
 }
 
-// WithXApiBytes sets the xApiBytes header on every request.
-func WithXApiBytes(xApiBytes []byte) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.XApiBytes = xApiBytes
-	}
+// WithXApiDate sets the xApiDate request header.
+func WithXApiDate(xApiDate time.Time) *core.XApiDateOption {
+	return option.WithXApiDate(xApiDate)
 }
 
-// WithXApiOptionalName sets the xApiOptionalName header on every request.
-func WithXApiOptionalName(xApiOptionalName *string) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.XApiOptionalName = xApiOptionalName
-	}
+// WithXApiBytes sets the xApiBytes request header.
+func WithXApiBytes(xApiBytes []byte) *core.XApiBytesOption {
+	return option.WithXApiBytes(xApiBytes)
 }
 
-// WithXApiOptionalId sets the xApiOptionalId header on every request.
-func WithXApiOptionalId(xApiOptionalId *uuid.UUID) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.XApiOptionalId = xApiOptionalId
-	}
+// WithXApiOptionalName sets the xApiOptionalName request header.
+func WithXApiOptionalName(xApiOptionalName *string) *core.XApiOptionalNameOption {
+	return option.WithXApiOptionalName(xApiOptionalName)
 }
 
-// WithXApiOptionalDatetime sets the xApiOptionalDatetime header on every request.
-func WithXApiOptionalDatetime(xApiOptionalDatetime *time.Time) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.XApiOptionalDatetime = xApiOptionalDatetime
-	}
+// WithXApiOptionalId sets the xApiOptionalId request header.
+func WithXApiOptionalId(xApiOptionalId *uuid.UUID) *core.XApiOptionalIdOption {
+	return option.WithXApiOptionalId(xApiOptionalId)
 }
 
-// WithXApiOptionalDate sets the xApiOptionalDate header on every request.
-func WithXApiOptionalDate(xApiOptionalDate *time.Time) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.XApiOptionalDate = xApiOptionalDate
-	}
+// WithXApiOptionalDatetime sets the xApiOptionalDatetime request header.
+func WithXApiOptionalDatetime(xApiOptionalDatetime *time.Time) *core.XApiOptionalDatetimeOption {
+	return option.WithXApiOptionalDatetime(xApiOptionalDatetime)
 }
 
-// WithXApiOptionalBytes sets the xApiOptionalBytes header on every request.
-func WithXApiOptionalBytes(xApiOptionalBytes *[]byte) core.ClientOption {
-	return func(opts *core.ClientOptions) {
-		opts.XApiOptionalBytes = xApiOptionalBytes
-	}
+// WithXApiOptionalDate sets the xApiOptionalDate request header.
+func WithXApiOptionalDate(xApiOptionalDate *time.Time) *core.XApiOptionalDateOption {
+	return option.WithXApiOptionalDate(xApiOptionalDate)
+}
+
+// WithXApiOptionalBytes sets the xApiOptionalBytes request header.
+func WithXApiOptionalBytes(xApiOptionalBytes *[]byte) *core.XApiOptionalBytesOption {
+	return option.WithXApiOptionalBytes(xApiOptionalBytes)
+}
+
+// WithIdempotencyKey sets the idempotencyKey request header.
+func WithIdempotencyKey(idempotencyKey string) *core.IdempotencyKeyOption {
+	return option.WithIdempotencyKey(idempotencyKey)
 }

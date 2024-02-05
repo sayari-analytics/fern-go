@@ -25,11 +25,13 @@ func run(config *cmd.Config, coordinator *coordinator.Client) ([]*generator.File
 	generatorConfig, err := generator.NewConfig(
 		config.DryRun,
 		config.EnableExplicitNull,
+		config.IncludeLegacyClientOptions,
 		includeReadme,
 		config.Organization,
 		config.Version,
 		config.IrFilepath,
 		config.ImportPath,
+		config.PackageName,
 		config.Module,
 	)
 	if err != nil {

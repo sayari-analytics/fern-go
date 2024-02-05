@@ -4,6 +4,7 @@ package client
 
 import (
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/cycle/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/cycle/fixtures/option"
 	userclient "github.com/fern-api/fern-go/internal/testdata/sdk/cycle/fixtures/user/client"
 	http "net/http"
 )
@@ -16,15 +17,17 @@ type Client struct {
 	User *userclient.Client
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
-		User:    userclient.NewClient(opts...),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
+		User:   userclient.NewClient(opts...),
 	}
 }

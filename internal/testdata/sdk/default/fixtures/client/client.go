@@ -6,6 +6,7 @@ import (
 	http "net/http"
 	core "sdk/core"
 	file "sdk/file"
+	option "sdk/option"
 )
 
 type Client struct {
@@ -16,15 +17,17 @@ type Client struct {
 	File *file.Client
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
-		File:    file.NewClient(opts...),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
+		File:   file.NewClient(opts...),
 	}
 }
