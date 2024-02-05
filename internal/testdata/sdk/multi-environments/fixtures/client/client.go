@@ -5,6 +5,7 @@ package client
 import (
 	auth "github.com/fern-api/fern-go/internal/testdata/sdk/multi-environments/fixtures/auth"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/multi-environments/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/multi-environments/fixtures/option"
 	plant "github.com/fern-api/fern-go/internal/testdata/sdk/multi-environments/fixtures/plant"
 	http "net/http"
 )
@@ -18,16 +19,18 @@ type Client struct {
 	Plant *plant.Client
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
-		Auth:    auth.NewClient(opts...),
-		Plant:   plant.NewClient(opts...),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
+		Auth:   auth.NewClient(opts...),
+		Plant:  plant.NewClient(opts...),
 	}
 }

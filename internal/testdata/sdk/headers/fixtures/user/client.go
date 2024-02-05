@@ -8,6 +8,7 @@ import (
 	fmt "fmt"
 	fixtures "github.com/fern-api/fern-go/internal/testdata/sdk/headers/fixtures"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/headers/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/headers/fixtures/option"
 	http "net/http"
 	time "time"
 )
@@ -18,26 +19,38 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) SetName(ctx context.Context, userId string, request *fixtures.SetNameRequest) (string, error) {
+func (c *Client) SetName(
+	ctx context.Context,
+	userId string,
+	request *fixtures.SetNameRequest,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"users/%v/set-name", userId)
 
-	headers := c.header.Clone()
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 	headers.Add("X-Endpoint-Header", fmt.Sprintf("%v", request.XEndpointHeader))
 	headers.Add("X-Endpoint-ID-Header", fmt.Sprintf("%v", request.XEndpointIdHeader))
 	headers.Add("X-Endpoint-Date-Header", fmt.Sprintf("%v", request.XEndpointDateHeader.Format("2006-01-02")))
@@ -64,10 +77,49 @@ func (c *Client) SetName(ctx context.Context, userId string, request *fixtures.S
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  headers,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
+		},
+	); err != nil {
+		return "", err
+	}
+	return response, nil
+}
+
+func (c *Client) UpdateName(
+	ctx context.Context,
+	userId string,
+	request *fixtures.UpdateNameRequest,
+	opts ...option.IdempotentRequestOption,
+) (string, error) {
+	options := core.NewIdempotentRequestOptions(opts...)
+
+	baseURL := ""
+	if c.baseURL != "" {
+		baseURL = c.baseURL
+	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
+	endpointURL := fmt.Sprintf(baseURL+"/"+"users/%v/update-name", userId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
+	headers.Add("X-Endpoint-Header", fmt.Sprintf("%v", request.XEndpointHeader))
+
+	var response string
+	if err := c.caller.Call(
+		ctx,
+		&core.CallParams{
+			URL:         endpointURL,
+			Method:      http.MethodPut,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err

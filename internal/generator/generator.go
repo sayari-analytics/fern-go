@@ -120,8 +120,8 @@ func (g *Generator) Generate(mode Mode) ([]*File, error) {
 	return g.generate(ir, mode)
 }
 
-func (g *Generator) generateModelTypes(ir *fernir.IntermediateRepresentation, mode Mode) ([]*File, error) {
-	fileInfoToTypes, err := fileInfoToTypes(ir.ApiName, ir.Types, ir.Services, ir.ServiceTypeReferenceInfo)
+func (g *Generator) generateModelTypes(ir *fernir.IntermediateRepresentation, mode Mode, rootPackageName string) ([]*File, error) {
+	fileInfoToTypes, err := fileInfoToTypes(rootPackageName, ir.Types, ir.Services, ir.ServiceTypeReferenceInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,12 @@ func (g *Generator) generateModelTypes(ir *fernir.IntermediateRepresentation, mo
 						return nil, err
 					}
 				} else if mode == ModeClient {
-					if err := writer.WriteRequestType(typeToGenerate.FernFilepath, typeToGenerate.Endpoint, g.config.EnableExplicitNull); err != nil {
+					if err := writer.WriteRequestType(
+						typeToGenerate.FernFilepath,
+						typeToGenerate.Endpoint,
+						ir.IdempotencyHeaders,
+						g.config.EnableExplicitNull,
+					); err != nil {
 						return nil, err
 					}
 				}
@@ -168,7 +173,7 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 		// import types from another package.
 		for _, typeDeclaration := range ir.Types {
 			typeImportPath := fernFilepathToImportPath(g.config.ImportPath, typeDeclaration.Name.FernFilepath)
-			for _, referencedType := range typeDeclaration.ReferencedTypes {
+			for _, referencedType := range declaredTypeNamesForTypeIDs(ir, typeDeclaration.ReferencedTypes) {
 				referencedImportPath := fernFilepathToImportPath(g.config.ImportPath, referencedType.FernFilepath)
 				if typeImportPath != referencedImportPath {
 					return nil, fmt.Errorf(
@@ -180,6 +185,7 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 			}
 		}
 	}
+	rootPackageName := getRootPackageName(ir, g.config.PackageName)
 	cycleInfo, err := cycleInfoFromIR(ir, g.config.ImportPath)
 	if err != nil {
 		return nil, err
@@ -222,7 +228,7 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 	var files []*File
 	// Write all of the package-level documentation, if any (i.e. in a doc.go file).
 	if ir.RootPackage != nil && ir.RootPackage.Docs != nil && len(*ir.RootPackage.Docs) > 0 {
-		fileInfo := fileInfoForPackage(ir.ApiName, ir.RootPackage.FernFilepath)
+		fileInfo := fileInfoForPackage(rootPackageName, ir.RootPackage.FernFilepath)
 		writer := newFileWriter(fileInfo.filename, fileInfo.packageName, "", nil, nil, g.coordinator)
 		writer.WriteDocs(ir.RootPackage.Docs)
 		files = append(files, writer.DocsFile())
@@ -231,14 +237,14 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 		if subpackage.Docs == nil || len(*subpackage.Docs) == 0 {
 			continue
 		}
-		fileInfo := fileInfoForPackage(ir.ApiName, subpackage.FernFilepath)
+		fileInfo := fileInfoForPackage(rootPackageName, subpackage.FernFilepath)
 		writer := newFileWriter(fileInfo.filename, fileInfo.packageName, "", nil, nil, g.coordinator)
 		writer.WriteDocs(subpackage.Docs)
 		files = append(files, writer.DocsFile())
 	}
 	// Then split up all the types based on the Fern directory they belong to (i.e. the root package,
 	// or some other subpackage).
-	modelFiles, err := g.generateModelTypes(ir, mode)
+	modelFiles, err := g.generateModelTypes(ir, mode, rootPackageName)
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +261,7 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 			generatedEnvironment *GeneratedEnvironment
 		)
 		// Generate the core API files.
-		fileInfo := fileInfoForClientOptionsDefinition()
+		fileInfo := fileInfoForRequestOptionsDefinition()
 		writer := newFileWriter(
 			fileInfo.filename,
 			fileInfo.packageName,
@@ -264,7 +270,14 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 			ir.Errors,
 			g.coordinator,
 		)
-		if err := writer.WriteClientOptionsDefinition(ir.Auth, ir.Headers, ir.SdkConfig, g.config.ModuleConfig, g.config.Version); err != nil {
+		if err := writer.WriteRequestOptionsDefinition(
+			ir.Auth,
+			ir.Headers,
+			ir.IdempotencyHeaders,
+			ir.SdkConfig,
+			g.config.ModuleConfig,
+			g.config.Version,
+		); err != nil {
 			return nil, err
 		}
 		file, err := writer.File()
@@ -272,10 +285,9 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 			return nil, err
 		}
 		files = append(files, file)
-
 		if ir.Environments != nil {
 			// Generate the core environments file.
-			fileInfo, useCore := fileInfoForEnvironments(ir.ApiName, generatedNames, generatedPackages)
+			fileInfo, useCore := fileInfoForEnvironments(rootPackageName, generatedNames, generatedPackages)
 			writer = newFileWriter(
 				fileInfo.filename,
 				fileInfo.packageName,
@@ -294,8 +306,8 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 			}
 			files = append(files, file)
 		}
-		// Generate the client options.
-		fileInfo = fileInfoForClientOptions(ir.ApiName, generatedNames)
+		// Generate the request options.
+		fileInfo = fileInfoForRequestOptions()
 		writer = newFileWriter(
 			fileInfo.filename,
 			fileInfo.packageName,
@@ -304,7 +316,7 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 			ir.Errors,
 			g.coordinator,
 		)
-		generatedAuth, err = writer.WriteClientOptions(ir.Auth, ir.Headers)
+		generatedAuth, err = writer.WriteRequestOptions(ir.Auth, ir.Headers)
 		if err != nil {
 			return nil, err
 		}
@@ -313,8 +325,64 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 			return nil, err
 		}
 		files = append(files, file)
+		if len(ir.IdempotencyHeaders) > 0 {
+			fileInfo = fileInfoForIdempotentRequestOptionsDefinition()
+			writer = newFileWriter(
+				fileInfo.filename,
+				fileInfo.packageName,
+				g.config.ImportPath,
+				ir.Types,
+				ir.Errors,
+				g.coordinator,
+			)
+			if err := writer.WriteIdempotentRequestOptionsDefinition(ir.IdempotencyHeaders); err != nil {
+				return nil, err
+			}
+			file, err = writer.File()
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, file)
+			fileInfo = fileInfoForIdempotentRequestOptions()
+			writer = newFileWriter(
+				fileInfo.filename,
+				fileInfo.packageName,
+				g.config.ImportPath,
+				ir.Types,
+				ir.Errors,
+				g.coordinator,
+			)
+			if err := writer.WriteIdempotentRequestOptions(ir.IdempotencyHeaders); err != nil {
+				return nil, err
+			}
+			file, err = writer.File()
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, file)
+		}
+		if g.config.IncludeLegacyClientOptions {
+			// Generate the legacy client option helper functions (for backwards compatibility).
+			fileInfo = fileInfoForLegacyClientOptions()
+			writer = newFileWriter(
+				fileInfo.filename,
+				fileInfo.packageName,
+				g.config.ImportPath,
+				ir.Types,
+				ir.Errors,
+				g.coordinator,
+			)
+			if err = writer.WriteLegacyClientOptions(ir.Auth, ir.Headers, ir.IdempotencyHeaders); err != nil {
+				return nil, err
+			}
+			file, err = writer.File()
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, file)
+		}
 		// Generate the Optional[T] constructors.
-		fileInfo, useCore := fileInfoForOptionalHelpers(ir.ApiName, generatedNames, generatedPackages)
+		fileInfo, useCore := fileInfoForOptionalHelpers(rootPackageName, generatedNames, generatedPackages)
 		writer = newFileWriter(
 			fileInfo.filename,
 			fileInfo.packageName,
@@ -335,15 +403,20 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 			files = append(files, newOptionalFile(g.coordinator))
 			files = append(files, newOptionalTestFile(g.coordinator))
 		}
-		files = append(files, newClientTestFile(g.coordinator))
 		files = append(files, newCoreFile(g.coordinator))
 		files = append(files, newCoreTestFile(g.coordinator))
-		files = append(files, newPointerFile(g.coordinator, ir.ApiName, generatedNames))
+		files = append(files, newPointerFile(g.coordinator, rootPackageName, generatedNames))
+		files = append(files, newRetrierFile(g.coordinator))
 		if ir.SdkConfig.HasStreamingEndpoints {
 			files = append(files, newStreamFile(g.coordinator))
 		}
+		clientTestFile, err := newClientTestFile(g.config.ImportPath, g.coordinator)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, clientTestFile)
 		// Generate the error types, if any.
-		for fileInfo, irErrors := range fileInfoToErrors(ir.ApiName, ir.Errors) {
+		for fileInfo, irErrors := range fileInfoToErrors(rootPackageName, ir.Errors) {
 			writer := newFileWriter(
 				fileInfo.filename,
 				fileInfo.packageName,
@@ -538,6 +611,7 @@ func (g *Generator) generateService(
 	)
 	generatedClient, err := writer.WriteClient(
 		irService.Endpoints,
+		ir.IdempotencyHeaders,
 		irSubpackages,
 		ir.Environments,
 		ir.ErrorDiscriminationStrategy,
@@ -577,6 +651,7 @@ func (g *Generator) generateServiceWithoutEndpoints(
 	)
 	if _, err := writer.WriteClient(
 		nil,
+		ir.IdempotencyHeaders,
 		irSubpackages,
 		nil,
 		ir.ErrorDiscriminationStrategy,
@@ -610,6 +685,7 @@ func (g *Generator) generateRootServiceWithoutEndpoints(
 	)
 	generatedClient, err := writer.WriteClient(
 		nil,
+		ir.IdempotencyHeaders,
 		irSubpackages,
 		nil,
 		ir.ErrorDiscriminationStrategy,
@@ -640,6 +716,16 @@ func readIR(irFilename string) (*fernir.IntermediateRepresentation, error) {
 	return ir, nil
 }
 
+// declaredTypeNamesForTypeIDs resolves the set of typeIDs to their respective
+// declared type names.
+func declaredTypeNamesForTypeIDs(ir *fernir.IntermediateRepresentation, typeIDs []fernir.TypeId) []*fernir.DeclaredTypeName {
+	result := make([]*fernir.DeclaredTypeName, 0, len(typeIDs))
+	for _, typeDecl := range ir.Types {
+		result = append(result, typeDecl.Name)
+	}
+	return result
+}
+
 // newPointerFile returns a *File containing the pointer helper functions
 // used to more easily instantiate pointers to primitive values (e.g. *string).
 //
@@ -647,7 +733,7 @@ func readIR(irFilename string) (*fernir.IntermediateRepresentation, error) {
 // access the helpers alongside the rest of the top-level definitions. However,
 // if any naming conflict exists between the generated types, this file is
 // deposited in the core package.
-func newPointerFile(coordinator *coordinator.Client, apiName *fernir.Name, generatedNames map[string]struct{}) *File {
+func newPointerFile(coordinator *coordinator.Client, rootPackageName string, generatedNames map[string]struct{}) *File {
 	// First determine whether or not we need to generate the type in the
 	// core package.
 	var useCorePackage bool
@@ -676,7 +762,7 @@ func newPointerFile(coordinator *coordinator.Client, apiName *fernir.Name, gener
 	content := strings.Replace(
 		pointerFile,
 		"package core",
-		fmt.Sprintf("package %s", strings.ToLower(apiName.CamelCase.SafeName)),
+		fmt.Sprintf("package %s", rootPackageName),
 		1,
 	)
 	return NewFile(
@@ -686,12 +772,20 @@ func newPointerFile(coordinator *coordinator.Client, apiName *fernir.Name, gener
 	)
 }
 
-func newClientTestFile(coordinator *coordinator.Client) *File {
-	return NewFile(
-		coordinator,
+func newClientTestFile(
+	baseImportPath string,
+	coordinator *coordinator.Client,
+) (*File, error) {
+	f := newFileWriter(
 		"client/client_test.go",
-		[]byte(clientTestFile),
+		"client",
+		baseImportPath,
+		nil,
+		nil,
+		coordinator,
 	)
+	f.WriteRaw(clientTestFile)
+	return f.File()
 }
 
 func newCoreFile(coordinator *coordinator.Client) *File {
@@ -734,6 +828,14 @@ func newStreamFile(coordinator *coordinator.Client) *File {
 	)
 }
 
+func newRetrierFile(coordinator *coordinator.Client) *File {
+	return NewFile(
+		coordinator,
+		"core/retrier.go",
+		[]byte(retrierFile),
+	)
+}
+
 func newStringerFile(coordinator *coordinator.Client) *File {
 	return NewFile(
 		coordinator,
@@ -747,31 +849,42 @@ type fileInfo struct {
 	packageName string
 }
 
-func fileInfoForClientOptionsDefinition() *fileInfo {
+func fileInfoForRequestOptionsDefinition() *fileInfo {
 	return &fileInfo{
-		filename:    "core/client_option.go",
+		filename:    "core/request_option.go",
 		packageName: "core",
 	}
 }
 
-// TODO: We need to guard against the case when the user defines a client.yml file.
-func fileInfoForClientOptions(apiName *fernir.Name, generatedNames map[string]struct{}) *fileInfo {
+func fileInfoForIdempotentRequestOptionsDefinition() *fileInfo {
+	return &fileInfo{
+		filename:    "core/idempotent_request_option.go",
+		packageName: "core",
+	}
+}
+
+func fileInfoForRequestOptions() *fileInfo {
+	return &fileInfo{
+		filename:    "option/request_option.go",
+		packageName: "option",
+	}
+}
+
+func fileInfoForIdempotentRequestOptions() *fileInfo {
+	return &fileInfo{
+		filename:    "option/idempotent_request_option.go",
+		packageName: "option",
+	}
+}
+
+func fileInfoForLegacyClientOptions() *fileInfo {
 	return &fileInfo{
 		filename:    "client/options.go",
 		packageName: "client",
 	}
 }
 
-// fileInfoForCoreClientOptions is used when the client options need to be generated in
-// the core package.
-func fileInfoForCoreClientOptions() *fileInfo {
-	return &fileInfo{
-		filename:    "core/client_options.go",
-		packageName: "core",
-	}
-}
-
-func fileInfoForOptionalHelpers(apiName *fernir.Name, generatedNames map[string]struct{}, generatedPackages map[string]struct{}) (*fileInfo, bool) {
+func fileInfoForOptionalHelpers(rootPackageName string, generatedNames map[string]struct{}, generatedPackages map[string]struct{}) (*fileInfo, bool) {
 	_, hasOptional := generatedNames["Optional"]
 	_, hasNull := generatedNames["Null"]
 	if hasOptional || hasNull {
@@ -783,16 +896,16 @@ func fileInfoForOptionalHelpers(apiName *fernir.Name, generatedNames map[string]
 	if _, ok := generatedPackages["optional"]; ok {
 		return &fileInfo{
 			filename:    "_optional.go",
-			packageName: strings.ToLower(apiName.CamelCase.SafeName),
+			packageName: rootPackageName,
 		}, false
 	}
 	return &fileInfo{
 		filename:    "optional.go",
-		packageName: strings.ToLower(apiName.CamelCase.SafeName),
+		packageName: rootPackageName,
 	}, false
 }
 
-func fileInfoForEnvironments(apiName *fernir.Name, generatedNames map[string]struct{}, generatedPackages map[string]struct{}) (*fileInfo, bool) {
+func fileInfoForEnvironments(rootPackageName string, generatedNames map[string]struct{}, generatedPackages map[string]struct{}) (*fileInfo, bool) {
 	if _, ok := generatedNames["Environments"]; ok {
 		return &fileInfo{
 			filename:    "core/environments.go",
@@ -802,16 +915,16 @@ func fileInfoForEnvironments(apiName *fernir.Name, generatedNames map[string]str
 	if _, ok := generatedPackages["environments"]; ok {
 		return &fileInfo{
 			filename:    "_environments.go",
-			packageName: strings.ToLower(apiName.CamelCase.SafeName),
+			packageName: rootPackageName,
 		}, false
 	}
 	return &fileInfo{
 		filename:    "environments.go",
-		packageName: strings.ToLower(apiName.CamelCase.SafeName),
+		packageName: rootPackageName,
 	}, false
 }
 
-func fileInfoForType(apiName *fernir.Name, fernFilepath *fernir.FernFilepath) fileInfo {
+func fileInfoForType(rootPackageName string, fernFilepath *fernir.FernFilepath) fileInfo {
 	var packages []string
 	for _, packageName := range fernFilepath.PackagePath {
 		packages = append(packages, strings.ToLower(packageName.CamelCase.SafeName))
@@ -823,7 +936,7 @@ func fileInfoForType(apiName *fernir.Name, fernFilepath *fernir.FernFilepath) fi
 	if len(packages) == 0 {
 		return fileInfo{
 			filename:    fmt.Sprintf("%s.go", basename),
-			packageName: strings.ToLower(apiName.CamelCase.SafeName),
+			packageName: rootPackageName,
 		}
 	}
 	return fileInfo{
@@ -840,7 +953,7 @@ func fileInfoForService(fernFilepath *fernir.FernFilepath) *fileInfo {
 	}
 }
 
-func fileInfoForPackage(apiName *fernir.Name, fernFilepath *fernir.FernFilepath) *fileInfo {
+func fileInfoForPackage(rootPackageName string, fernFilepath *fernir.FernFilepath) *fileInfo {
 	var packages []string
 	for _, packageName := range fernFilepath.PackagePath {
 		packages = append(packages, strings.ToLower(packageName.CamelCase.SafeName))
@@ -850,7 +963,7 @@ func fileInfoForPackage(apiName *fernir.Name, fernFilepath *fernir.FernFilepath)
 		// The top-level package uses the API's name as its package declaration.
 		return &fileInfo{
 			filename:    packageDocsFilename,
-			packageName: strings.ToLower(apiName.CamelCase.SafeName),
+			packageName: rootPackageName,
 		}
 	}
 	return &fileInfo{
@@ -935,7 +1048,7 @@ type typeToGenerate struct {
 
 // fileInfoToTypes consolidates all of the given types based on the file they will be generated into.
 func fileInfoToTypes(
-	apiName *fernir.Name,
+	rootPackageName string,
 	irTypes map[fernir.TypeId]*fernir.TypeDeclaration,
 	irServices map[fernir.ServiceId]*fernir.HttpService,
 	irServiceTypeReferenceInfo *fernir.ServiceTypeReferenceInfo,
@@ -946,7 +1059,7 @@ func fileInfoToTypes(
 			if shouldSkipRequestType(irEndpoint) {
 				continue
 			}
-			fileInfo := fileInfoForType(apiName, irService.Name.FernFilepath)
+			fileInfo := fileInfoForType(rootPackageName, irService.Name.FernFilepath)
 			result[fileInfo] = append(result[fileInfo], &typeToGenerate{ID: irEndpoint.Name.OriginalName, FernFilepath: irService.Name.FernFilepath, Endpoint: irEndpoint})
 		}
 	}
@@ -954,7 +1067,7 @@ func fileInfoToTypes(
 		// If the service type reference info isn't provided, default
 		// to the file-per-type naming convention.
 		for _, irType := range irTypes {
-			fileInfo := fileInfoForType(apiName, irType.Name.FernFilepath)
+			fileInfo := fileInfoForType(rootPackageName, irType.Name.FernFilepath)
 			result[fileInfo] = append(result[fileInfo], &typeToGenerate{ID: irType.Name.TypeId, FernFilepath: irType.Name.FernFilepath, TypeDeclaration: irType})
 		}
 	} else {
@@ -979,7 +1092,7 @@ func fileInfoToTypes(
 			}
 			fileInfo := fileInfo{
 				filename:    "types.go",
-				packageName: strings.ToLower(apiName.CamelCase.SafeName),
+				packageName: rootPackageName,
 			}
 			if directory := directories[sharedTypeId]; len(directory) > 0 {
 				fileInfo.filename = filepath.Join(append(directory, fileInfo.filename)...)
@@ -1015,7 +1128,7 @@ func fileInfoToTypes(
 			for _, packageName := range fernFilepath.PackagePath {
 				packages = append(packages, strings.ToLower(packageName.CamelCase.SafeName))
 			}
-			servicePackageName := strings.ToLower(apiName.CamelCase.SafeName)
+			servicePackageName := rootPackageName
 			if len(packages) > 0 {
 				servicePackageName = packages[len(packages)-1]
 			}
@@ -1030,7 +1143,7 @@ func fileInfoToTypes(
 					return nil, fmt.Errorf("IR ServiceTypeReferenceInfo referenced type %q which doesn't exist", typeId)
 				}
 				typeFilename := "types.go"
-				typePackageName := strings.ToLower(apiName.CamelCase.SafeName)
+				typePackageName := rootPackageName
 				if directory := directories[typeId]; len(directory) > 0 {
 					typeFilename = filepath.Join(append(directory, typeFilename)...)
 					typePackageName = directory[len(directory)-1]
@@ -1071,7 +1184,7 @@ func fileInfoToTypes(
 }
 
 func fileInfoToErrors(
-	apiName *fernir.Name,
+	rootPackageName string,
 	irErrorDeclarations map[fernir.ErrorId]*fernir.ErrorDeclaration,
 ) map[fileInfo][]*fernir.ErrorDeclaration {
 	result := make(map[fileInfo][]*fernir.ErrorDeclaration)
@@ -1082,7 +1195,7 @@ func fileInfoToErrors(
 		}
 		fileInfo := fileInfo{
 			filename:    "errors.go",
-			packageName: strings.ToLower(apiName.CamelCase.SafeName),
+			packageName: rootPackageName,
 		}
 		if len(elements) > 0 {
 			fileInfo.filename = filepath.Join(append(elements, fileInfo.filename)...)
@@ -1104,6 +1217,47 @@ func stringSetToSortedSlice(set map[string]struct{}) []string {
 	}
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
 	return sorted
+}
+
+// zeroValueForTypeReference returns the zero value for the given type reference.
+func zeroValueForTypeReference(typeReference *fernir.TypeReference) string {
+	if typeReference.Container != nil && typeReference.Container.Literal != nil {
+		switch typeReference.Container.Literal.Type {
+		case "string":
+			return `""`
+		case "boolean":
+			return "false"
+		}
+	}
+	if typeReference.Primitive != "" {
+		return zeroValueForPrimitive(typeReference.Primitive)
+	}
+	return "nil"
+}
+
+func zeroValueForPrimitive(primitive fernir.PrimitiveType) string {
+	switch primitive {
+	case fernir.PrimitiveTypeString:
+		return `""`
+	case fernir.PrimitiveTypeInteger, fernir.PrimitiveTypeDouble, fernir.PrimitiveTypeLong:
+		return "0"
+	case fernir.PrimitiveTypeBoolean:
+		return "false"
+	case fernir.PrimitiveTypeDateTime, fernir.PrimitiveTypeDate:
+		return "time.Time{}"
+	case fernir.PrimitiveTypeUuid, fernir.PrimitiveTypeBase64:
+		return "nil"
+	}
+	return "nil"
+}
+
+// getRootPackageName returns the generated root package name, using the API name if
+// an override is not explicitly provided.
+func getRootPackageName(ir *fernir.IntermediateRepresentation, packageNameOverride string) string {
+	if packageNameOverride != "" {
+		return packageNameOverride
+	}
+	return strings.ToLower(ir.ApiName.CamelCase.SafeName)
 }
 
 // pointerFunctionNames enumerates all of the pointer function names.

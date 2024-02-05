@@ -6,6 +6,7 @@ import (
 	context "context"
 	fern "github.com/response-property/fern"
 	core "github.com/response-property/fern/core"
+	option "github.com/response-property/fern/option"
 	http "net/http"
 )
 
@@ -15,34 +16,49 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) GetMovie(ctx context.Context, request string) (*fern.Movie, error) {
+func (c *Client) GetMovie(
+	ctx context.Context,
+	request string,
+	opts ...option.RequestOption,
+) (*fern.Movie, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "movie"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response *fern.Response
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -50,22 +66,35 @@ func (c *Client) GetMovie(ctx context.Context, request string) (*fern.Movie, err
 	return response.Data, nil
 }
 
-func (c *Client) GetMovieDocs(ctx context.Context, request string) (string, error) {
+func (c *Client) GetMovieDocs(
+	ctx context.Context,
+	request string,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "movie"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response *fern.Response
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -73,22 +102,35 @@ func (c *Client) GetMovieDocs(ctx context.Context, request string) (string, erro
 	return response.Docs, nil
 }
 
-func (c *Client) GetMovieName(ctx context.Context, request string) (string, error) {
+func (c *Client) GetMovieName(
+	ctx context.Context,
+	request string,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "movie"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response *fern.StringResponse
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -96,22 +138,35 @@ func (c *Client) GetMovieName(ctx context.Context, request string) (string, erro
 	return response.Data, nil
 }
 
-func (c *Client) GetMovieMetadata(ctx context.Context, request string) (map[string]string, error) {
+func (c *Client) GetMovieMetadata(
+	ctx context.Context,
+	request string,
+	opts ...option.RequestOption,
+) (map[string]string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "movie"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response *fern.Response
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -119,12 +174,23 @@ func (c *Client) GetMovieMetadata(ctx context.Context, request string) (map[stri
 	return response.Metadata, nil
 }
 
-func (c *Client) GetOptionalMovie(ctx context.Context, request string) (*fern.Movie, error) {
+func (c *Client) GetOptionalMovie(
+	ctx context.Context,
+	request string,
+	opts ...option.RequestOption,
+) (*fern.Movie, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "movie"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response *fern.Response
 	if err := c.caller.Call(
@@ -132,7 +198,9 @@ func (c *Client) GetOptionalMovie(ctx context.Context, request string) (*fern.Mo
 		&core.CallParams{
 			URL:                endpointURL,
 			Method:             http.MethodPost,
-			Headers:            c.header,
+			MaxAttempts:        options.MaxAttempts,
+			Headers:            headers,
+			Client:             options.HTTPClient,
 			Request:            request,
 			Response:           &response,
 			ResponseIsOptional: true,
@@ -143,22 +211,35 @@ func (c *Client) GetOptionalMovie(ctx context.Context, request string) (*fern.Mo
 	return response.Data, nil
 }
 
-func (c *Client) GetOptionalMovieDocs(ctx context.Context, request string) (string, error) {
+func (c *Client) GetOptionalMovieDocs(
+	ctx context.Context,
+	request string,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "movie"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response fern.OptionalWithDocs
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -166,22 +247,35 @@ func (c *Client) GetOptionalMovieDocs(ctx context.Context, request string) (stri
 	return response.Docs, nil
 }
 
-func (c *Client) GetOptionalMovieName(ctx context.Context, request string) (string, error) {
+func (c *Client) GetOptionalMovieName(
+	ctx context.Context,
+	request string,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "movie"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response fern.OptionalStringResponse
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err

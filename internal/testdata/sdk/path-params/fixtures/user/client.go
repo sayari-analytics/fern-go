@@ -6,6 +6,7 @@ import (
 	context "context"
 	fmt "fmt"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/path-params/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/path-params/fixtures/option"
 	http "net/http"
 )
 
@@ -15,33 +16,48 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) GetUser(ctx context.Context, userId string) (string, error) {
+func (c *Client) GetUser(
+	ctx context.Context,
+	userId string,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
+	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
 	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"users/%v", userId)
 
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
+
 	var response string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -49,21 +65,34 @@ func (c *Client) GetUser(ctx context.Context, userId string) (string, error) {
 	return response, nil
 }
 
-func (c *Client) GetUserV2(ctx context.Context, userId string) (string, error) {
+func (c *Client) GetUserV2(
+	ctx context.Context,
+	userId string,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
+	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
 	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"users/get/%v/info", userId)
 
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
+
 	var response string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err
@@ -71,21 +100,35 @@ func (c *Client) GetUserV2(ctx context.Context, userId string) (string, error) {
 	return response, nil
 }
 
-func (c *Client) GetUserV3(ctx context.Context, userId string, infoId string) (string, error) {
+func (c *Client) GetUserV3(
+	ctx context.Context,
+	userId string,
+	infoId string,
+	opts ...option.RequestOption,
+) (string, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := ""
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"users/get/%v/info/%v", userId, infoId)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response string
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return "", err

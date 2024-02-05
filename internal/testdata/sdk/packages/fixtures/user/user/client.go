@@ -6,6 +6,7 @@ import (
 	context "context"
 	config "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/config"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/option"
 	user "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/user"
 	http "net/http"
 )
@@ -16,34 +17,49 @@ type Client struct {
 	header  http.Header
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
 	}
 }
 
-func (c *Client) Create(ctx context.Context, request *user.CreateUserRequest) ([]*user.User, error) {
+func (c *Client) Create(
+	ctx context.Context,
+	request *user.CreateUserRequest,
+	opts ...option.RequestOption,
+) ([]*user.User, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "users"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response []*user.User
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -51,21 +67,33 @@ func (c *Client) Create(ctx context.Context, request *user.CreateUserRequest) ([
 	return response, nil
 }
 
-func (c *Client) List(ctx context.Context) ([]*user.User, error) {
+func (c *Client) List(
+	ctx context.Context,
+	opts ...option.RequestOption,
+) ([]*user.User, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "users"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response []*user.User
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -73,22 +101,35 @@ func (c *Client) List(ctx context.Context) ([]*user.User, error) {
 	return response, nil
 }
 
-func (c *Client) Update(ctx context.Context, request *config.Config) (bool, error) {
+func (c *Client) Update(
+	ctx context.Context,
+	request *config.Config,
+	opts ...option.RequestOption,
+) (bool, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
+	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
 	}
 	endpointURL := baseURL + "/" + "users/update"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response bool
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return false, err

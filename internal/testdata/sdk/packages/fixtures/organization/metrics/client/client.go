@@ -6,6 +6,7 @@ import (
 	context "context"
 	fmt "fmt"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/option"
 	organization "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/organization"
 	metrics "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/organization/metrics"
 	tag "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/organization/metrics/tag"
@@ -20,35 +21,50 @@ type Client struct {
 	Tag *tag.Client
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
 		baseURL: options.BaseURL,
-		caller:  core.NewCaller(options.HTTPClient),
-		header:  options.ToHeader(),
-		Tag:     tag.NewClient(opts...),
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
+		header: options.ToHeader(),
+		Tag:    tag.NewClient(opts...),
 	}
 }
 
-func (c *Client) CreateMetricsTag(ctx context.Context, request *organization.CreateMetricsTagRequest) (*metrics.Tag, error) {
+func (c *Client) CreateMetricsTag(
+	ctx context.Context,
+	request *organization.CreateMetricsTagRequest,
+	opts ...option.RequestOption,
+) (*metrics.Tag, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "metrics"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response *metrics.Tag
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodPost,
-			Headers:  c.header,
-			Request:  request,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodPost,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Request:     request,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -56,21 +72,34 @@ func (c *Client) CreateMetricsTag(ctx context.Context, request *organization.Cre
 	return response, nil
 }
 
-func (c *Client) GetMetricsTag(ctx context.Context, id string) (*metrics.Tag, error) {
+func (c *Client) GetMetricsTag(
+	ctx context.Context,
+	id string,
+	opts ...option.RequestOption,
+) (*metrics.Tag, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := fmt.Sprintf(baseURL+"/"+"metrics/%v", id)
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response *metrics.Tag
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err

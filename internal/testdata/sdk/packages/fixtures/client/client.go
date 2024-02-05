@@ -10,6 +10,7 @@ import (
 	fixtures "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures"
 	configclient "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/config/client"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/core"
+	option "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/option"
 	organizationclient "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/organization/client"
 	userclient "github.com/fern-api/fern-go/internal/testdata/sdk/packages/fixtures/user/client"
 	io "io"
@@ -26,14 +27,16 @@ type Client struct {
 	Organization *organizationclient.Client
 }
 
-func NewClient(opts ...core.ClientOption) *Client {
-	options := core.NewClientOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewClient(opts ...option.RequestOption) *Client {
+	options := core.NewRequestOptions(opts...)
 	return &Client{
-		baseURL:      options.BaseURL,
-		caller:       core.NewCaller(options.HTTPClient),
+		baseURL: options.BaseURL,
+		caller: core.NewCaller(
+			&core.CallerParams{
+				Client:      options.HTTPClient,
+				MaxAttempts: options.MaxAttempts,
+			},
+		),
 		header:       options.ToHeader(),
 		User:         userclient.NewClient(opts...),
 		Config:       configclient.NewClient(opts...),
@@ -41,21 +44,33 @@ func NewClient(opts ...core.ClientOption) *Client {
 	}
 }
 
-func (c *Client) GetFoo(ctx context.Context) ([]*fixtures.Foo, error) {
+func (c *Client) GetFoo(
+	ctx context.Context,
+	opts ...option.RequestOption,
+) ([]*fixtures.Foo, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "foo"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	var response []*fixtures.Foo
 	if err := c.caller.Call(
 		ctx,
 		&core.CallParams{
-			URL:      endpointURL,
-			Method:   http.MethodGet,
-			Headers:  c.header,
-			Response: &response,
+			URL:         endpointURL,
+			Method:      http.MethodGet,
+			MaxAttempts: options.MaxAttempts,
+			Headers:     headers,
+			Client:      options.HTTPClient,
+			Response:    &response,
 		},
 	); err != nil {
 		return nil, err
@@ -63,12 +78,23 @@ func (c *Client) GetFoo(ctx context.Context) ([]*fixtures.Foo, error) {
 	return response, nil
 }
 
-func (c *Client) PostFoo(ctx context.Context, request *fixtures.Foo) (*fixtures.Foo, error) {
+func (c *Client) PostFoo(
+	ctx context.Context,
+	request *fixtures.Foo,
+	opts ...option.RequestOption,
+) (*fixtures.Foo, error) {
+	options := core.NewRequestOptions(opts...)
+
 	baseURL := "https://api.foo.io/v1"
 	if c.baseURL != "" {
 		baseURL = c.baseURL
 	}
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
 	endpointURL := baseURL + "/" + "foo"
+
+	headers := core.MergeHeaders(c.header.Clone(), options.ToHeader())
 
 	errorDecoder := func(statusCode int, body io.Reader) error {
 		raw, err := io.ReadAll(body)
@@ -102,7 +128,9 @@ func (c *Client) PostFoo(ctx context.Context, request *fixtures.Foo) (*fixtures.
 		&core.CallParams{
 			URL:          endpointURL,
 			Method:       http.MethodPost,
-			Headers:      c.header,
+			MaxAttempts:  options.MaxAttempts,
+			Headers:      headers,
+			Client:       options.HTTPClient,
 			Request:      request,
 			Response:     &response,
 			ErrorDecoder: errorDecoder,
