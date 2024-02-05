@@ -117,6 +117,7 @@ func TestCall(t *testing.T) {
 				&CallerParams{
 					Client: client,
 				},
+				nil,
 			)
 			var response *Response
 			err := caller.Call(

@@ -206,6 +206,8 @@ func (f *fileWriter) WriteIdempotentRequestOptionsDefinition(idempotencyHeaders 
 			typeReferenceToGoType(header.ValueType, f.types, f.scope, f.baseImportPath, importPath, false),
 		)
 	}
+	// Add rate limiter
+	f.P("RateLimiter *RateLimiter")
 
 	f.P("}")
 	f.P()
@@ -317,6 +319,9 @@ func (f *fileWriter) WriteRequestOptionsDefinition(
 			typeReferenceToGoType(header.ValueType, f.types, f.scope, f.baseImportPath, importPath, false),
 		)
 	}
+	// Add rate limiter
+	f.P("RateLimiter *RateLimiter")
+
 	f.P("}")
 	f.P()
 
@@ -513,6 +518,10 @@ func (f *fileWriter) writeRequestOptionStructs(
 		if err := f.writeOptionStruct(pascalCase, goType, true, asIdempotentRequestOption); err != nil {
 			return err
 		}
+	}
+
+	if err := f.writeOptionStruct("RateLimiter", "*RateLimiter", true, asIdempotentRequestOption); err != nil {
+		return err
 	}
 
 	return nil
@@ -770,6 +779,15 @@ func (f *fileWriter) WriteRequestOptions(
 		f.P("}")
 		f.P()
 	}
+
+	f.P("// WithRateLimiter will provide a rate limiter for the client.")
+	f.P("func WithRateLimiter(rateLimiter *core.RateLimiter) *core.RateLimiterOption {")
+	f.P("return &core.RateLimiterOption{")
+	f.P("RateLimiter: rateLimiter,")
+	f.P("}")
+	f.P("}")
+	f.P()
+
 	if option == nil {
 		return nil, nil
 	}
@@ -838,6 +856,7 @@ func (f *fileWriter) WriteClient(
 	f.P("Client: options.HTTPClient,")
 	f.P("MaxAttempts: options.MaxAttempts,")
 	f.P("},")
+	f.P("options.RateLimiter,")
 	f.P("),")
 	f.P("header: options.ToHeader(),")
 	for _, subpackage := range subpackages {
