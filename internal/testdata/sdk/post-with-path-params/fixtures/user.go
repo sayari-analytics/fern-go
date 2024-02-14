@@ -6,15 +6,42 @@ import (
 	json "encoding/json"
 	fmt "fmt"
 	core "github.com/fern-api/fern-go/internal/testdata/sdk/post-with-path-params/fixtures/core"
+	time "time"
 )
 
 type SetNameRequest struct {
-	UserName string `json:"userName"`
+	UserName string    `json:"userName" url:"userName"`
+	Date     time.Time `json:"date" url:"date" format:"date"`
+	Datetime time.Time `json:"datetime" url:"datetime"`
+}
+
+func (s *SetNameRequest) UnmarshalJSON(data []byte) error {
+	type unmarshaler SetNameRequest
+	var body unmarshaler
+	if err := json.Unmarshal(data, &body); err != nil {
+		return err
+	}
+	*s = SetNameRequest(body)
+	return nil
+}
+
+func (s *SetNameRequest) MarshalJSON() ([]byte, error) {
+	type embed SetNameRequest
+	var marshaler = struct {
+		embed
+		Date     *core.Date     `json:"date"`
+		Datetime *core.DateTime `json:"datetime"`
+	}{
+		embed:    embed(*s),
+		Date:     core.NewDate(s.Date),
+		Datetime: core.NewDateTime(s.Datetime),
+	}
+	return json.Marshal(marshaler)
 }
 
 type SetNameRequestV3 struct {
-	XEndpointHeader string                `json:"-"`
-	Body            *SetNameRequestV3Body `json:"-"`
+	XEndpointHeader string                `json:"-" url:"-"`
+	Body            *SetNameRequestV3Body `json:"-" url:"-"`
 }
 
 func (s *SetNameRequestV3) UnmarshalJSON(data []byte) error {
@@ -31,8 +58,8 @@ func (s *SetNameRequestV3) MarshalJSON() ([]byte, error) {
 }
 
 type SetNameRequestV3Optional struct {
-	XEndpointHeader string                `json:"-"`
-	Body            *SetNameRequestV3Body `json:"-"`
+	XEndpointHeader string                `json:"-" url:"-"`
+	Body            *SetNameRequestV3Body `json:"-" url:"-"`
 }
 
 func (s *SetNameRequestV3Optional) UnmarshalJSON(data []byte) error {
@@ -49,8 +76,8 @@ func (s *SetNameRequestV3Optional) MarshalJSON() ([]byte, error) {
 }
 
 type SetNameRequestV4 struct {
-	XEndpointHeader string   `json:"-"`
-	Body            []string `json:"-"`
+	XEndpointHeader string   `json:"-" url:"-"`
+	Body            []string `json:"-" url:"-"`
 }
 
 func (s *SetNameRequestV4) UnmarshalJSON(data []byte) error {
@@ -67,8 +94,8 @@ func (s *SetNameRequestV4) MarshalJSON() ([]byte, error) {
 }
 
 type SetNameRequestV5 struct {
-	XEndpointHeader string `json:"-"`
-	Body            string `json:"-"`
+	XEndpointHeader string `json:"-" url:"-"`
+	Body            string `json:"-" url:"-"`
 }
 
 func (s *SetNameRequestV5) UnmarshalJSON(data []byte) error {
@@ -88,7 +115,7 @@ func (s *SetNameRequestV5) MarshalJSON() ([]byte, error) {
 }
 
 type Filter struct {
-	Tag string `json:"tag"`
+	Tag string `json:"tag" url:"tag"`
 
 	_rawJSON json.RawMessage
 }
@@ -117,7 +144,7 @@ func (f *Filter) String() string {
 }
 
 type SetNameRequestV3Body struct {
-	UserName string `json:"userName"`
+	UserName string `json:"userName" url:"userName"`
 
 	_rawJSON json.RawMessage
 }
@@ -226,10 +253,36 @@ func (u *Union) Accept(visitor UnionVisitor) error {
 }
 
 type UpdateRequest struct {
-	Tag            string  `json:"-"`
-	Extra          *string `json:"-"`
-	Union          *Union  `json:"union,omitempty"`
-	Filter         *Filter `json:"filter,omitempty"`
-	OptionalUnion  *Union  `json:"optionalUnion,omitempty"`
-	OptionalFilter *Filter `json:"optionalFilter,omitempty"`
+	Tag              string     `json:"-" url:"tag"`
+	Extra            *string    `json:"-" url:"extra,omitempty"`
+	Union            *Union     `json:"union,omitempty" url:"union,omitempty"`
+	Filter           *Filter    `json:"filter,omitempty" url:"filter,omitempty"`
+	OptionalUnion    *Union     `json:"optionalUnion,omitempty" url:"optionalUnion,omitempty"`
+	OptionalFilter   *Filter    `json:"optionalFilter,omitempty" url:"optionalFilter,omitempty"`
+	OptionalDate     *time.Time `json:"optionalDate,omitempty" url:"optionalDate,omitempty" format:"date"`
+	OptionalDatetime *time.Time `json:"optionalDatetime,omitempty" url:"optionalDatetime,omitempty"`
+}
+
+func (u *UpdateRequest) UnmarshalJSON(data []byte) error {
+	type unmarshaler UpdateRequest
+	var body unmarshaler
+	if err := json.Unmarshal(data, &body); err != nil {
+		return err
+	}
+	*u = UpdateRequest(body)
+	return nil
+}
+
+func (u *UpdateRequest) MarshalJSON() ([]byte, error) {
+	type embed UpdateRequest
+	var marshaler = struct {
+		embed
+		OptionalDate     *core.Date     `json:"optionalDate,omitempty"`
+		OptionalDatetime *core.DateTime `json:"optionalDatetime,omitempty"`
+	}{
+		embed:            embed(*u),
+		OptionalDate:     core.NewOptionalDate(u.OptionalDate),
+		OptionalDatetime: core.NewOptionalDateTime(u.OptionalDatetime),
+	}
+	return json.Marshal(marshaler)
 }

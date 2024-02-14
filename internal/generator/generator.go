@@ -250,6 +250,7 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 	}
 	files = append(files, modelFiles...)
 	files = append(files, newStringerFile(g.coordinator))
+	files = append(files, newTimeFile(g.coordinator))
 	// Then handle mode-specific generation tasks.
 	var generatedClient *GeneratedClient
 	switch mode {
@@ -407,6 +408,8 @@ func (g *Generator) generate(ir *fernir.IntermediateRepresentation, mode Mode) (
 		files = append(files, newCoreTestFile(g.coordinator))
 		files = append(files, newPointerFile(g.coordinator, rootPackageName, generatedNames))
 		files = append(files, newRetrierFile(g.coordinator))
+		files = append(files, newQueryFile(g.coordinator))
+		files = append(files, newQueryTestFile(g.coordinator))
 		if ir.SdkConfig.HasStreamingEndpoints {
 			files = append(files, newStreamFile(g.coordinator))
 		}
@@ -836,11 +839,35 @@ func newRetrierFile(coordinator *coordinator.Client) *File {
 	)
 }
 
+func newQueryFile(coordinator *coordinator.Client) *File {
+	return NewFile(
+		coordinator,
+		"core/query.go",
+		[]byte(queryFile),
+	)
+}
+
+func newQueryTestFile(coordinator *coordinator.Client) *File {
+	return NewFile(
+		coordinator,
+		"core/query_test.go",
+		[]byte(queryTestFile),
+	)
+}
+
 func newStringerFile(coordinator *coordinator.Client) *File {
 	return NewFile(
 		coordinator,
 		"core/stringer.go",
 		[]byte(stringerFile),
+	)
+}
+
+func newTimeFile(coordinator *coordinator.Client) *File {
+	return NewFile(
+		coordinator,
+		"core/time.go",
+		[]byte(timeFile),
 	)
 }
 
